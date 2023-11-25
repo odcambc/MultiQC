@@ -4,9 +4,18 @@
 
 ### MultiQC updates
 
+- Fix the `"square": True` flag to scatter plot to actually make the plot square ([#2189](https://github.com/ewels/MultiQC/pull/2189))
+- Config `table_columns_visible` and `table_columns_name`: support flat config and `table_id` as a group ([#2191](https://github.com/ewels/MultiQC/pull/2191))
+- Upgrade the jQuery tablesorter plugin to v2 ([#1666](https://github.com/ewels/MultiQC/pull/1666))
+- Allow specifying default sort columns for tables with `defaultsort` ([#1667](https://github.com/ewels/MultiQC/pull/1667))
+- Create CODE_OF_CONDUCT.md ([#2195](https://github.com/ewels/MultiQC/pull/2195))
+- BCLConvert: fix mean quality, fix count-per-lane barplot ([#2197](https://github.com/ewels/MultiQC/pull/2197))
+
 ### New Modules
 
 ### Module updates
+
+- **GATK**: square the BaseRecalibrator scatter plot ([#2189](https://github.com/ewels/MultiQC/pull/2189))
 
 ## [MultiQC v1.18](https://github.com/ewels/MultiQC/releases/tag/v1.18) - 2023-11-17
 

@@ -18,27 +18,27 @@ class AnalyzeSaturationMutagenesisMixin:
     def parse_gatk_analyze_saturation_mutagenesis(self):
         """Find GATK AnalyzeSaturationMutagenesis logs and parse their data"""
 
-        self.gatk_analyze_saturation_mutagenesis_readcount = {}
-        self.gatk_analyze_saturation_mutagenesis_refcoverage = {}
-        self.gatk_analyze_saturation_mutagenesis_coveragelengthcount = {}
+        self.gatk_asm_readcount = {}
+        self.gatk_asm_refcoverage = {}
+        self.gatk_asm_coveragelengthcount = {}
 
         # Parse readCounts files.
         for file_handle in self.find_log_files("gatk/analyze_saturation_mutagenesis/readcounts", filehandles=True):
             parsed_readcounts = self.parse_read_counts_file(file_handle["f"])
             if len(parsed_readcounts) > 1:
-                if file_handle["s_name"] in self.gatk_analyze_saturation_mutagenesis_readcount:
+                if file_handle["s_name"] in self.gatk_asm_readcount:
                     log.debug("Duplicate sample name found! Overwriting: %s", {file_handle["s_name"]})
                 self.add_data_source(file_handle, section="analyze_saturation_mutagenesis")
-                self.gatk_analyze_saturation_mutagenesis_readcount[file_handle["s_name"]] = parsed_readcounts
+                self.gatk_asm_readcount[file_handle["s_name"]] = parsed_readcounts
 
         # Parse refCoverage files.
         for file_handle in self.find_log_files("gatk/analyze_saturation_mutagenesis/refcoverage", filehandles=True):
             parsed_refcoverage = self.parse_ref_coverage_file(file_handle["f"])
             if len(parsed_refcoverage) > 1:
-                if file_handle["s_name"] in self.gatk_analyze_saturation_mutagenesis_refcoverage:
+                if file_handle["s_name"] in self.gatk_asm_refcoverage:
                     log.debug("Duplicate sample name found! Overwriting: %s", {file_handle["s_name"]})
                 self.add_data_source(file_handle, section="analyze_saturation_mutagenesis")
-                self.gatk_analyze_saturation_mutagenesis_refcoverage[file_handle["s_name"]] = parsed_refcoverage
+                self.gatk_asm_refcoverage[file_handle["s_name"]] = parsed_refcoverage
 
         # Parse coverageLengthCounts files.
         for file_handle in self.find_log_files(
@@ -46,48 +46,35 @@ class AnalyzeSaturationMutagenesisMixin:
         ):
             parsed_coveragelengthcounts = self.parse_coverage_length_counts_file(file_handle["f"])
             if len(parsed_coveragelengthcounts) > 1:
-                if file_handle["s_name"] in self.gatk_analyze_saturation_mutagenesis_coveragelengthcount:
+                if file_handle["s_name"] in self.gatk_asm_coveragelengthcount:
                     log.debug("Duplicate sample name found! Overwriting: %s", {file_handle["s_name"]})
                 self.add_data_source(file_handle, section="analyze_saturation_mutagenesis")
-                self.gatk_analyze_saturation_mutagenesis_coveragelengthcount[
-                    file_handle["s_name"]
-                ] = parsed_coveragelengthcounts
+                self.gatk_asm_coveragelengthcount[file_handle["s_name"]] = parsed_coveragelengthcounts
 
         # Filter to strip out ignored sample names
-        self.gatk_analyze_saturation_mutagenesis_readcount = self.ignore_samples(
-            self.gatk_analyze_saturation_mutagenesis_readcount
-        )
-        self.gatk_analyze_saturation_mutagenesis_refcoverage = self.ignore_samples(
-            self.gatk_analyze_saturation_mutagenesis_refcoverage
-        )
-        self.gatk_analyze_saturation_mutagenesis_coveragelengthcount = self.ignore_samples(
-            self.gatk_analyze_saturation_mutagenesis_coveragelengthcount
-        )
+        self.gatk_asm_readcount = self.ignore_samples(self.gatk_asm_readcount)
+        self.gatk_asm_refcoverage = self.ignore_samples(self.gatk_asm_refcoverage)
+        self.gatk_asm_coveragelengthcount = self.ignore_samples(self.gatk_asm_coveragelengthcount)
 
-        n_reports_found = len(self.gatk_analyze_saturation_mutagenesis_readcount)
+        n_reports_found = len(self.gatk_asm_readcount)
 
         if n_reports_found == 0:
             return 0
 
         log.info("Found %d AnalyzeSaturationMutagenesis reports", n_reports_found)
 
-        # Superfluous function call to confirm that it is used in this module
-        # Replace None with actual version if it is available
+        # TODO: parse this
         self.add_software_version(None)
 
         # Write parsed report data to a file
-        self.write_data_file(
-            self.gatk_analyze_saturation_mutagenesis_readcount, "multiqc_gatk_analyze_saturation_mutagenesis"
-        )
+        self.write_data_file(self.gatk_asm_readcount, "multiqc_gatk_asm")
 
-        self.gatk_analyze_saturation_mutagenesis_table(self.gatk_analyze_saturation_mutagenesis_readcount)
+        self.gatk_asm_table(self.gatk_asm_readcount)
         # Add plots
-        self.gatk_analyze_saturation_mutagenesis_plot_reads(self.gatk_analyze_saturation_mutagenesis_readcount)
-        self.gatk_analyze_saturation_mutagenesis_plot_base_calls(self.gatk_analyze_saturation_mutagenesis_readcount)
-        self.gatk_analyze_saturation_mutagenesis_plot_refcoverage(self.gatk_analyze_saturation_mutagenesis_refcoverage)
-        self.gatk_analyze_saturation_mutagenesis_plot_coveragelength(
-            self.gatk_analyze_saturation_mutagenesis_coveragelengthcount
-        )
+        self.gatk_asm_plot_reads(self.gatk_asm_readcount)
+        self.gatk_asm_plot_base_calls(self.gatk_asm_readcount)
+        self.gatk_asm_plot_refcoverage(self.gatk_asm_refcoverage)
+        self.gatk_asm_plot_coveragelength(self.gatk_asm_coveragelengthcount)
 
         return n_reports_found
 
@@ -190,7 +177,7 @@ class AnalyzeSaturationMutagenesisMixin:
         )
         return data
 
-    def gatk_analyze_saturation_mutagenesis_plot_reads(self, data):
+    def gatk_asm_plot_reads(self, data):
         """Make the plot for GATK AnalyzeSaturationMutagenesis read counts and add the section."""
         cats = {
             "filtered_reads": {"name": "Filtered reads"},
@@ -214,7 +201,7 @@ class AnalyzeSaturationMutagenesisMixin:
             plot=bargraph.plot(data, cats, pconfig),
         )
 
-    def gatk_analyze_saturation_mutagenesis_plot_base_calls(self, data):
+    def gatk_asm_plot_base_calls(self, data):
         """Make the plot for GATK AnalyzeSaturationMutagenesis base calls and add the section."""
 
         cats = {
@@ -238,7 +225,7 @@ class AnalyzeSaturationMutagenesisMixin:
             plot=bargraph.plot(data, cats, pconfig),
         )
 
-    def gatk_analyze_saturation_mutagenesis_plot_refcoverage(self, data):
+    def gatk_asm_plot_refcoverage(self, data):
         """Make the plot for GATK AnalyzeSaturationMutagenesis refcoverage files and add the section."""
 
         pconfig = {
@@ -254,11 +241,11 @@ class AnalyzeSaturationMutagenesisMixin:
             name="Reference coverage counts",
             anchor="gatk-asm-ref-coverage",
             description="Reference coverage counts.",
-            helptext=""" ... """,
+            helptext="""This plot shows the counts of reads evaluated by GATK at each position of the reference ORF.""",
             plot=linegraph.plot(data, pconfig),
         )
 
-    def gatk_analyze_saturation_mutagenesis_plot_coveragelength(self, data):
+    def gatk_asm_plot_coveragelength(self, data):
         """Make the plot for GATK AnalyzeSaturationMutagenesis coverageLengthCounts files and add the section."""
 
         pconfig = {
@@ -274,11 +261,11 @@ class AnalyzeSaturationMutagenesisMixin:
             name="Coverage length histogram",
             anchor="gatk-asm-coverage-length",
             description="Coverage length counts.",
-            helptext=""" ... """,
+            helptext="""This histogram shows the lengths of reads mapped to the reference evaluated by GATK.""",
             plot=linegraph.plot(data, pconfig),
         )
 
-    def gatk_analyze_saturation_mutagenesis_table(self, data):
+    def gatk_asm_table(self, data):
         """Make the table for GATK AnalyzeSaturationMutagenesis and add the section."""
         asm_headers = {
             "total_reads": {

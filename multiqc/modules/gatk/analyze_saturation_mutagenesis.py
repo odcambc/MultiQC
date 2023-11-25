@@ -6,7 +6,7 @@ import logging
 from collections import defaultdict
 
 from multiqc import config
-from multiqc.plots import bargraph, table
+from multiqc.plots import bargraph, linegraph, table
 
 # Initialise the logger
 log = logging.getLogger(__name__)
@@ -18,20 +18,54 @@ class AnalyzeSaturationMutagenesisMixin:
     def parse_gatk_analyze_saturation_mutagenesis(self):
         """Find GATK AnalyzeSaturationMutagenesis logs and parse their data"""
 
-        self.gatk_analyze_saturation_mutagenesis = {}
+        self.gatk_analyze_saturation_mutagenesis_readcount = {}
+        self.gatk_analyze_saturation_mutagenesis_refcoverage = {}
+        self.gatk_analyze_saturation_mutagenesis_coveragelengthcount = {}
 
-        for file_handle in self.find_log_files("gatk/analyze_saturation_mutagenesis", filehandles=True):
-            parsed_data = self.parse_read_counts_file(file_handle["f"])
-            if len(parsed_data) > 1:
-                if file_handle["s_name"] in self.gatk_analyze_saturation_mutagenesis:
-                    log.debug(f"Duplicate sample name found! Overwriting: {file_handle['s_name']}")
+        # Parse readCounts files.
+        for file_handle in self.find_log_files("gatk/analyze_saturation_mutagenesis/readcounts", filehandles=True):
+            parsed_readcounts = self.parse_read_counts_file(file_handle["f"])
+            if len(parsed_readcounts) > 1:
+                if file_handle["s_name"] in self.gatk_analyze_saturation_mutagenesis_readcount:
+                    log.debug("Duplicate sample name found! Overwriting: %s", {file_handle["s_name"]})
                 self.add_data_source(file_handle, section="analyze_saturation_mutagenesis")
-                self.gatk_analyze_saturation_mutagenesis[file_handle["s_name"]] = parsed_data
+                self.gatk_analyze_saturation_mutagenesis_readcount[file_handle["s_name"]] = parsed_readcounts
+
+        # Parse refCoverage files.
+        for file_handle in self.find_log_files("gatk/analyze_saturation_mutagenesis/refcoverage", filehandles=True):
+            parsed_refcoverage = self.parse_ref_coverage_file(file_handle["f"])
+            if len(parsed_refcoverage) > 1:
+                if file_handle["s_name"] in self.gatk_analyze_saturation_mutagenesis_refcoverage:
+                    log.debug("Duplicate sample name found! Overwriting: %s", {file_handle["s_name"]})
+                self.add_data_source(file_handle, section="analyze_saturation_mutagenesis")
+                self.gatk_analyze_saturation_mutagenesis_refcoverage[file_handle["s_name"]] = parsed_refcoverage
+
+        # Parse coverageLengthCounts files.
+        for file_handle in self.find_log_files(
+            "gatk/analyze_saturation_mutagenesis/coveragelengthcounts", filehandles=True
+        ):
+            parsed_coveragelengthcounts = self.parse_coverage_length_counts_file(file_handle["f"])
+            if len(parsed_coveragelengthcounts) > 1:
+                if file_handle["s_name"] in self.gatk_analyze_saturation_mutagenesis_coveragelengthcount:
+                    log.debug("Duplicate sample name found! Overwriting: %s", {file_handle["s_name"]})
+                self.add_data_source(file_handle, section="analyze_saturation_mutagenesis")
+                self.gatk_analyze_saturation_mutagenesis_coveragelengthcount[
+                    file_handle["s_name"]
+                ] = parsed_coveragelengthcounts
 
         # Filter to strip out ignored sample names
-        self.gatk_analyze_saturation_mutagenesis = self.ignore_samples(self.gatk_analyze_saturation_mutagenesis)
+        self.gatk_analyze_saturation_mutagenesis_readcount = self.ignore_samples(
+            self.gatk_analyze_saturation_mutagenesis_readcount
+        )
+        self.gatk_analyze_saturation_mutagenesis_refcoverage = self.ignore_samples(
+            self.gatk_analyze_saturation_mutagenesis_refcoverage
+        )
+        self.gatk_analyze_saturation_mutagenesis_coveragelengthcount = self.ignore_samples(
+            self.gatk_analyze_saturation_mutagenesis_coveragelengthcount
+        )
 
-        n_reports_found = len(self.gatk_analyze_saturation_mutagenesis)
+        n_reports_found = len(self.gatk_analyze_saturation_mutagenesis_readcount)
+
         if n_reports_found == 0:
             return 0
 
@@ -41,15 +75,61 @@ class AnalyzeSaturationMutagenesisMixin:
         # Replace None with actual version if it is available
         self.add_software_version(None)
 
-        # Write parsed report data to a file (restructure first)
-        self.write_data_file(self.gatk_analyze_saturation_mutagenesis, "multiqc_gatk_analyze_saturation_mutagenesis")
+        # Write parsed report data to a file
+        self.write_data_file(
+            self.gatk_analyze_saturation_mutagenesis_readcount, "multiqc_gatk_analyze_saturation_mutagenesis"
+        )
 
-        self.gatk_analyze_saturation_mutagenesis_table(self.gatk_analyze_saturation_mutagenesis)
+        self.gatk_analyze_saturation_mutagenesis_table(self.gatk_analyze_saturation_mutagenesis_readcount)
         # Add plots
-        self.gatk_analyze_saturation_mutagenesis_plot_reads(self.gatk_analyze_saturation_mutagenesis)
-        self.gatk_analyze_saturation_mutagenesis_plot_base_calls(self.gatk_analyze_saturation_mutagenesis)
+        self.gatk_analyze_saturation_mutagenesis_plot_reads(self.gatk_analyze_saturation_mutagenesis_readcount)
+        self.gatk_analyze_saturation_mutagenesis_plot_base_calls(self.gatk_analyze_saturation_mutagenesis_readcount)
+        self.gatk_analyze_saturation_mutagenesis_plot_refcoverage(self.gatk_analyze_saturation_mutagenesis_refcoverage)
+        self.gatk_analyze_saturation_mutagenesis_plot_coveragelength(
+            self.gatk_analyze_saturation_mutagenesis_coveragelengthcount
+        )
 
         return n_reports_found
+
+    def parse_coverage_length_counts_file(self, file_handle):
+        """Parse a coverageLengthCounts output file from GATK AnalyzeSaturationMutagenesis.
+        This file provides the read length counts of reference coverage.
+        These files are tab delimited sheets _without_ headers.
+
+        Key 1 is length in nucleotides, and key 2 is counts."""
+
+        data = defaultdict(int)
+
+        # There is no header row.
+
+        for line in file_handle:
+            fields = line.split("\t")
+            length = int(fields[0])
+            count = int(fields[1])
+            data[length] = count
+
+        return data
+
+    def parse_ref_coverage_file(self, file_handle):
+        """Parse a refCoverage output file from GATK AnalyzeSaturationMutagenesis.
+        This file provides the coverage counts of the reference.
+        These files are tab delimited sheets _with_ headers.
+
+        Key 1, RefPos, is the position in the orf (as passed to GATK).
+        Key 2, Coverage, is the coverage at that position."""
+
+        data = defaultdict(int)
+
+        # Skip header row
+        file_handle.readline()
+
+        for line in file_handle:
+            fields = line.split("\t")
+            ref_pos = int(fields[0])
+            coverage = int(fields[1])
+            data[ref_pos] = coverage
+
+        return data
 
     def parse_read_counts_file(self, file_handle):
         """Parse a readCounts output file from GATK AnalyzeSaturationMutagenesis
@@ -136,6 +216,7 @@ class AnalyzeSaturationMutagenesisMixin:
 
     def gatk_analyze_saturation_mutagenesis_plot_base_calls(self, data):
         """Make the plot for GATK AnalyzeSaturationMutagenesis base calls and add the section."""
+
         cats = {
             "evaluated_base_calls": {"name": "Base calls evaluated for variants"},
             "unevaluated_base_calls": {"name": "Base calls not evaluated for variants"},
@@ -155,6 +236,46 @@ class AnalyzeSaturationMutagenesisMixin:
             helptext="""Bases can be filtered by GATK AnalyzeSaturationMutagenesis for a number of reasons, including low quality, insufficient flank, and other pathologies.
              This plot shows the number of base calls that were evaluated for variants and the number of base calls that were not evaluated for variants.""",
             plot=bargraph.plot(data, cats, pconfig),
+        )
+
+    def gatk_analyze_saturation_mutagenesis_plot_refcoverage(self, data):
+        """Make the plot for GATK AnalyzeSaturationMutagenesis refcoverage files and add the section."""
+
+        pconfig = {
+            "id": "gatk_ASM_refcoverage_plot",
+            "title": "GATK AnalyzeSaturationMutagenesis: Reference coverage counts",
+            "xlab": "Reference nucleotide position",
+            "ylab": "Coverage count",
+            "logswitch": True,
+            "yfloor": 0,
+        }
+
+        self.add_section(
+            name="Reference coverage counts",
+            anchor="gatk-asm-ref-coverage",
+            description="Reference coverage counts.",
+            helptext=""" ... """,
+            plot=linegraph.plot(data, pconfig),
+        )
+
+    def gatk_analyze_saturation_mutagenesis_plot_coveragelength(self, data):
+        """Make the plot for GATK AnalyzeSaturationMutagenesis coverageLengthCounts files and add the section."""
+
+        pconfig = {
+            "id": "gatk_ASM_coverage_length_plot",
+            "title": "GATK AnalyzeSaturationMutagenesis: Coverage length histogram",
+            "xlab": "Read length",
+            "ylab": "Count",
+            "logswitch": True,
+            "yfloor": 0,
+        }
+
+        self.add_section(
+            name="Coverage length histogram",
+            anchor="gatk-asm-coverage-length",
+            description="Coverage length counts.",
+            helptext=""" ... """,
+            plot=linegraph.plot(data, pconfig),
         )
 
     def gatk_analyze_saturation_mutagenesis_table(self, data):
@@ -379,7 +500,7 @@ class AnalyzeSaturationMutagenesisMixin:
         }
 
         # Add module specific prefix to all keys to be safe
-        prefix = "gatk_ask_"
+        prefix = "gatk_asm_"
         asm_headers = {f"{prefix}{k}": v for k, v in asm_headers.items()}
         data = {sn: {f"{prefix}{k}": v for k, v in d.items()} for sn, d in data.items()}
 
